@@ -5,15 +5,19 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
+from PIL import Image
 import base64
 import os
 
-# Constants
+# Paths
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
 INPUT_PDF_AF = "LABELY.pdf"
 
-# Coordinates for each label (2 per row × 4 rows = 8 labels = 32 positions)
+# Register font
+pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
+
+# Coordinates (left and right columns for 8 labels)
 text_entries = [
     ((109.33, 781.51), (407.84, 781.51)), ((109.35, 762.71), (405.16, 762.19)),
     ((109.33, 743.10), (405.15, 743.09)), ((109.33, 706.16), (405.15, 706.16)),
@@ -25,22 +29,16 @@ text_entries = [
     ((109.31, 112.04), (405.12, 112.04)), ((109.33, 75.56), (405.15, 75.56)),
 ]
 
-pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
-
-def generate_pdf(text_map, output_file, base_pdf):
+def generate_pdf(texts, output_file, base_pdf):
     packet = BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
     c.setFont("ArialBold", 10)
 
-    # Prepare replacement texts
-    keys = ["LATTAFA PERFUME", "YARA DEO 200 ML", "AA53140ADF0001-01", "DEO-09-2024"]
-    texts = [text_map[key] for key in keys]
-
-    for i, ((x1, y1), (x2, y2)) in enumerate(text_entries):
-        text_value = texts[i % 4]
-        c.drawString(x1, y1, text_value)
-        c.drawString(x2, y2, text_value)
-
+    for i in range(len(text_entries)):
+        for j in range(2):  # 0 = left column, 1 = right column
+            label_index = i % len(texts)
+            x, y = text_entries[i][j]
+            c.drawString(x, y, texts[label_index])
     c.save()
     packet.seek(0)
 
@@ -53,6 +51,7 @@ def generate_pdf(text_map, output_file, base_pdf):
 
     with open(output_file, "wb") as f:
         writer.write(f)
+
     return output_file
 
 def file_download_link(filepath, label):
@@ -62,11 +61,26 @@ def file_download_link(filepath, label):
     href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
     return href
 
-# Streamlit UI
+# --- Streamlit UI ---
 st.set_page_config(page_title="Label Generator", layout="centered")
-st.title("Dispatch Label Generator")
 
+# Logo and title
+col1, col2 = st.columns([1, 5])
+with col1:
+    try:
+        logo = Image.open("logo.png")
+        st.image(logo, width=120)
+    except:
+        st.write("")
+
+with col2:
+    st.markdown("<h1 style='margin-top: 10px;'>Dispatch Label Generator</h1>", unsafe_allow_html=True)
+
+st.divider()
+
+# Product form
 product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
+
 customer = st.text_input("Customer")
 product = st.text_input("Product")
 litho = st.text_input("Litho Number")
@@ -82,8 +96,9 @@ if st.button("Generate PDF"):
             "AA53140ADF0001-01": litho,
             "DEO-09-2024": po,
         }
-        output_name = f"{product.replace(' ', '_')}_{product_type.replace(' ', '_')}.pdf"
+        texts = [text_map[k] for k in ["LATTAFA PERFUME", "YARA DEO 200 ML", "AA53140ADF0001-01", "DEO-09-2024"]]
+        output_name = f"{product.replace(' ', '_')}_{product_type}.pdf"
         base_pdf = INPUT_PDF_DEO if product_type == "DEO" else INPUT_PDF_AF
-        path = generate_pdf(text_map, output_name, base_pdf)
+        path = generate_pdf(texts, output_name, base_pdf)
         st.success("PDF generated successfully!")
         st.markdown(file_download_link(path, "📄 Download PDF"), unsafe_allow_html=True)
