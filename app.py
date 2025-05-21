@@ -9,7 +9,7 @@ import base64
 import os
 from PIL import Image
 
-# --- ACCESS KEYS ---
+# --- Secure Login First ---
 VALID_KEYS = {
     "shadT9fX3LpZ",
     "XshadL2mP9vQ",
@@ -18,70 +18,62 @@ VALID_KEYS = {
     "D9TzshadX1wE"
 }
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Login | Label Generator", layout="centered", initial_sidebar_state="collapsed")
+if "access_granted" not in st.session_state:
+    st.session_state.access_granted = False
 
-# --- SET BACKGROUND ---
-def set_background(image_file):
-    with open(image_file, "rb") as f:
-        b64_img = base64.b64encode(f.read()).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{b64_img}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        .login-box {{
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 2rem;
-            border-radius: 15px;
-            max-width: 400px;
-            margin: auto;
-            margin-top: 10%;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+if not st.session_state.access_granted:
+    st.title("🔐 Secure Access")
 
-set_background("BGD.png")
-
-# --- LOGIN SCREEN ---
-def login_ui():
-    st.markdown('<div class="login-box">', unsafe_allow_html=True)
-    st.image("logo.png", width=200)
-    st.markdown("### 🔐 Login to Continue")
-
-    key_input = st.text_input("Enter Access Key", type="password", placeholder="Enter your access code")
+    key_input = st.text_input("Enter your access key:", type="password")
 
     whatsapp_number = "971565690659"
     help_url = f"https://wa.me/{whatsapp_number}?text=Hello,+I+need+help+accessing+the+app"
-    st.markdown(f"<small>Need help? <a href='{help_url}' target='_blank'>Contact via WhatsApp</a></small>", unsafe_allow_html=True)
 
-    access_granted = False
+    st.markdown(
+        f"❓ Need help? [Contact us on WhatsApp]({help_url})",
+        unsafe_allow_html=True
+    )
 
     if key_input:
         if key_input in VALID_KEYS:
-            st.success("✅ Access granted!")
-            access_granted = True
+            st.session_state.access_granted = True
+            st.success("✅ Access granted! Redirecting...")
+            st.experimental_rerun()
         else:
             st.error("❌ Invalid access key.")
-    st.markdown('</div>', unsafe_allow_html=True)
-    return access_granted
-
-if not login_ui():
     st.stop()
 
-# --- MAIN APP STARTS AFTER LOGIN ---
 # --- Configuration ---
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
 INPUT_PDF_AF = "LABELY.pdf"
+
 pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
+
+st.set_page_config(page_title="Label Generator", layout="centered", initial_sidebar_state="collapsed")
+
+# --- Background ---
+def set_background(image_file):
+    with open(image_file, "rb") as f:
+        b64_img = base64.b64encode(f.read()).decode()
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{b64_img}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    .block-container {{
+        background-color: rgba(255, 255, 255, 0.9);
+        padding-top: 5rem;
+        border-radius: 10px;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+set_background("BGD.png")
 
 # --- Text Layout ---
 text_entries = [
@@ -131,8 +123,11 @@ def file_download_link(filepath, label):
     href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
     return href
 
-# --- UI ---
-st.title("📦 Dispatch Label Generator")
+# --- Main App UI ---
+logo = Image.open("logo.png")
+st.image(logo, width=150)
+
+st.title("Dispatch Label Generator")
 
 product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
 customer = st.text_input("Customer")
