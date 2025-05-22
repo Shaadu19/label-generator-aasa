@@ -12,7 +12,7 @@ from PIL import Image
 # --- Secure Login First ---
 VALID_KEYS = {
     "shadT9fX3LpZ",
-    "XshadL2mP9vQ",
+    "aasa@2025",
     "K7shadR8t1zW",
     "Lp2Xshad7mQc",
     "D9TzshadX1wE"
