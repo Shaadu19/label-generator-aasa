@@ -9,7 +9,7 @@ import base64
 import os
 from PIL import Image
 
-# --- Secure Login First ---
+# --- Secure Login ---
 VALID_KEYS = {
     "shadT9fX3LpZ",
     "aasa@2025",
@@ -35,21 +35,28 @@ if not st.session_state.access_granted:
     )
 
     if key_input:
-        if key_input in VALID_KEYS:
+        cleaned_key = key_input.strip()
+        st.write(f"🔍 You entered: `{repr(cleaned_key)}`")  # Debugging aid
+        if cleaned_key in VALID_KEYS:
             st.session_state.access_granted = True
             st.success("✅ Access granted! Redirecting...")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("❌ Invalid access key.")
     st.stop()
+
+# --- Optional Logout ---
+if st.session_state.access_granted:
+    if st.button("🔒 Logout"):
+        st.session_state.access_granted = False
+        st.success("Logged out!")
+        st.rerun()
 
 # --- Configuration ---
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
 INPUT_PDF_AF = "LABELY.pdf"
-
 pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
-
 st.set_page_config(page_title="Label Generator", layout="centered", initial_sidebar_state="collapsed")
 
 # --- Background ---
@@ -123,10 +130,9 @@ def file_download_link(filepath, label):
     href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
     return href
 
-# --- Main App UI ---
+# --- Main UI ---
 logo = Image.open("logo.png")
 st.image(logo, width=150)
-
 st.title("Dispatch Label Generator")
 
 product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
