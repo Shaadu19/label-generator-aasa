@@ -9,6 +9,22 @@ from PIL import Image
 import base64
 import os
 
+# --- Background ---
+def set_background(BGD):
+    with open(BGD, "rb") as f:
+        b64_img = base64.b64encode(f.read()).decode()
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{b64_img}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
 # Paths
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
@@ -63,6 +79,7 @@ def file_download_link(filepath, label):
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Label Generator", layout="centered")
+set_background("BGD.png")  # 🔹 This applies the background
 
 # Logo and title
 col1, col2 = st.columns([1, 5])
