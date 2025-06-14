@@ -8,15 +8,16 @@ from io import BytesIO
 import base64
 import os
 
-# --- Paths ---
+# === CONFIG ===
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
 INPUT_PDF_AF = "LABELY.pdf"
+BG_IMAGE = "BGD.PNG"
 
-# Register font
+# === REGISTER FONT ===
 pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
 
-# Coordinates for 8 labels (left & right column)
+# === COORDINATES FOR LABELS ===
 text_entries = [
     ((109.33, 781.51), (407.84, 781.51)),
     ((109.35, 762.71), (405.16, 762.19)),
@@ -28,14 +29,32 @@ text_entries = [
     ((109.33, 496.80), (405.15, 496.80)),
 ]
 
-# --- Functions ---
+# === SET BACKGROUND IMAGE ===
+def set_bg(image_file):
+    with open(image_file, "rb") as f:
+        data = base64.b64encode(f.read()).decode()
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{data}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+set_bg(BG_IMAGE)
+
+# === GENERATE PDF FUNCTION ===
 def generate_pdf(texts, output_file, base_pdf):
     packet = BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
     c.setFont("ArialBold", 10)
 
     for i in range(8):
-        for j in range(2):  # Left and right
+        for j in range(2):  # Left & right columns
             x, y = text_entries[i][j]
             c.drawString(x, y, texts[j])
     c.save()
@@ -52,53 +71,51 @@ def generate_pdf(texts, output_file, base_pdf):
         writer.write(f)
     return output_file
 
-def file_download_link(filepath, label):
-    with open(filepath, "rb") as f:
-        data = f.read()
-    b64 = base64.b64encode(data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
-    return href
+# === EMBED PDF PREVIEW ===
+def show_pdf_preview(pdf_file):
+    with open(pdf_file, "rb") as f:
+        base64_pdf = base64.b64encode(f.read()).decode("utf-8")
+    pdf_display = f"""
+        <iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>
+        <br><a href="data:application/pdf;base64,{base64_pdf}" download="{os.path.basename(pdf_file)}" style="font-size:16px;">📥 Download PDF</a>
+    """
+    st.markdown(pdf_display, unsafe_allow_html=True)
 
-def show_logo():
-    st.image("https://chatgpt-image-hosting.s3.amazonaws.com/aasa-logo.png", width=100)
-
-# --- Streamlit App ---
+# === PAGE CONFIG ===
 st.set_page_config(page_title="Label Generator", layout="centered")
 
-# Initialize session state
+# === SESSION STATE ===
 if "page" not in st.session_state:
     st.session_state.page = "home"
-if "pdf_ready" not in st.session_state:
-    st.session_state.pdf_ready = False
+if "pdf_generated" not in st.session_state:
+    st.session_state.pdf_generated = False
+if "generated_pdf_path" not in st.session_state:
+    st.session_state.generated_pdf_path = None
 
-# --- PAGE 1: Main Menu ---
+# === PAGE 1: MAIN MENU ===
 if st.session_state.page == "home":
-    show_logo()
-    st.markdown("<h2 style='text-align:center;'>SELECT THE LABEL</h2>", unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
+    st.markdown("<h2 style='text-align:center;'>SELECT LABEL TYPE</h2>", unsafe_allow_html=True)
+    col1, _ = st.columns([1, 1])
     with col1:
         if st.button("DISPATCH LABEL"):
             st.session_state.page = "dispatch"
-            
-    with col2:
-        if st.button("SCRAP LABEL"):
-            st.info("Scrap Label page is under construction.")
-
-# --- PAGE 2: Dispatch Form ---
-elif st.session_state.page == "dispatch":
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        if st.button("⬅️ Back"):
-            st.session_state.page = "home"
-            st.session_state.pdf_ready = False
             st.experimental_rerun()
-    with col2:
-        show_logo()
 
-    st.markdown("<h3>Fill the Form Below</h3>", unsafe_allow_html=True)
+# === PAGE 2: DISPATCH LABEL FORM ===
+elif st.session_state.page == "dispatch":
 
-    if not st.session_state.pdf_ready:
+    # Back button
+    if st.button("⬅️ Back"):
+        st.session_state.page = "home"
+        st.session_state.pdf_generated = False
+        st.experimental_rerun()
+
+    # Logo + Title
+    st.image("logo.png", width=120)  # Replace with your logo file if needed
+    st.markdown("<h2>Dispatch Label</h2>", unsafe_allow_html=True)
+    st.divider()
+
+    if not st.session_state.pdf_generated:
         product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
         customer = st.text_input("Customer")
         product = st.text_input("Product")
@@ -113,21 +130,14 @@ elif st.session_state.page == "dispatch":
                 output_name = f"{product.replace(' ', '_')}_{product_type}.pdf"
                 base_pdf = INPUT_PDF_DEO if product_type == "DEO" else INPUT_PDF_AF
                 path = generate_pdf(texts, output_name, base_pdf)
-
-                st.session_state.generated_path = path
-                st.session_state.pdf_ready = True
+                st.session_state.pdf_generated = True
+                st.session_state.generated_pdf_path = path
                 st.experimental_rerun()
 
-    # --- Show Preview and Download ---
-    if st.session_state.pdf_ready:
-        st.success("✅ PDF generated successfully!")
-
-        with open(st.session_state.generated_path, "rb") as f:
-            base64_pdf = base64.b64encode(f.read()).decode("utf-8")
-            st.markdown(
-                f'<iframe src="data:application/pdf;base64,{base64_pdf}" '
-                f'width="100%" height="600px" type="application/pdf"></iframe>',
-                unsafe_allow_html=True
-            )
-
-        st.markdown(file_download_link(st.session_state.generated_path, "📥 Download PDF"), unsafe_allow_html=True)
+    else:
+        st.success("✅ PDF Generated Successfully!")
+        show_pdf_preview(st.session_state.generated_pdf_path)
+        st.markdown(
+            f'<a href="{st.session_state.generated_pdf_path}" download="{os.path.basename(st.session_state.generated_pdf_path)}">📥 Download PDF</a>',
+            unsafe_allow_html=True,
+        )
