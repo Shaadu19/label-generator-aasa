@@ -8,7 +8,6 @@ from io import BytesIO
 from PIL import Image
 import base64
 import os
-import tempfile
 
 # --- Background ---
 def set_background(BGD):
@@ -34,7 +33,7 @@ INPUT_PDF_AF = "LABELY.pdf"
 # Register font
 pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
 
-# Coordinates for 8 labels (text positions)
+# Coordinates for 8 labels
 text_entries = [
     ((109.33, 781.51), (407.84, 781.51)),
     ((109.35, 762.71), (405.16, 762.19)),
@@ -46,33 +45,15 @@ text_entries = [
     ((109.33, 496.80), (405.15, 496.80)),
 ]
 
-# Signature positions (8 labels)
-signature_positions = [
-    (160.5532, 188.8262), (160.5532, 398.273),
-    (160.5532, 610.0177), (160.5532, 819.7198),
-    (458.0851, 188.8262), (458.0851, 398.273),
-    (458.0851, 610.0177), (458.0851, 819.7198),
-]
-
-def generate_pdf(texts, output_file, base_pdf, signature_img=None):
+def generate_pdf(texts, output_file, base_pdf):
     packet = BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
     c.setFont("ArialBold", 10)
 
-    sig_path = None
-    if signature_img:
-        sig = Image.open(signature_img).convert("RGB").resize((60, 30))
-        sig_path = tempfile.mktemp(suffix=".jpg")
-        sig.save(sig_path)
-
     for i in range(8):
-        for j in range(2):  # Left and right columns
+        for j in range(2):  # Left and right
             x, y = text_entries[i][j]
             c.drawString(x, y, texts[j])
-
-    if sig_path:
-        for x, y in signature_positions:
-            c.drawImage(sig_path, x, y, width=60, height=30, mask='auto')
 
     c.save()
     packet.seek(0)
@@ -100,7 +81,7 @@ def file_download_link(filepath, label):
 st.set_page_config(page_title="Label Generator", layout="centered")
 set_background("BGD.png")
 
-# Logo and title
+# Logo and Title
 col1, col2 = st.columns([1, 5])
 with col1:
     try:
@@ -113,37 +94,19 @@ with col2:
 
 st.divider()
 
-# --- Label Type Selection ---
-st.markdown("## Select Label Type")
-label_type = st.radio("Choose the label type to generate:", ["Select...", "Dispatch Label", "Scrap Label", "Other"])
+# --- Step 1: Select Label Type ---
+st.markdown("### Step 1: Choose Label Type")
+label_type = st.radio("Select Label Type", ["Dispatch Label", "Scrap Label", "Other"])
 
-if label_type == "Select...":
-    st.warning("Please select a label type to continue.")
-    st.stop()
-
-elif label_type == "Dispatch Label":
+# --- Step 2: Show form only after label is selected ---
+if label_type == "Dispatch Label":
+    st.markdown("### Step 2: Enter Dispatch Label Details")
+    
     product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
     customer = st.text_input("Customer")
     product = st.text_input("Product")
     litho = st.text_input("Litho Number")
     po = st.text_input("PO Number")
-
-    st.markdown("### Add Signature (Optional)")
-    sig_method = st.radio("Choose Signature Input", ["Upload", "Draw"])
-    signature_img = None
-
-    if sig_method == "Upload":
-        uploaded = st.file_uploader("Upload signature image (JPG/PNG)", type=["jpg", "jpeg", "png"])
-        if uploaded:
-            signature_img = uploaded
-    elif sig_method == "Draw":
-        drawn = st.canvas(draw_mode="freedraw", stroke_width=2, stroke_color="#000000", background_color="#ffffff", height=100, width=300, key="canvas")
-        if drawn and drawn.image_data is not None:
-            img = Image.fromarray((drawn.image_data * 255).astype("uint8")).convert("RGB")
-            temp_sig = BytesIO()
-            img.save(temp_sig, format="PNG")
-            temp_sig.seek(0)
-            signature_img = temp_sig
 
     if st.button("Generate PDF"):
         if not all([customer, product, litho, po]):
@@ -152,12 +115,12 @@ elif label_type == "Dispatch Label":
             texts = [customer, product]
             output_name = f"{product.replace(' ', '_')}_{product_type}.pdf"
             base_pdf = INPUT_PDF_DEO if product_type == "DEO" else INPUT_PDF_AF
-            path = generate_pdf(texts, output_name, base_pdf, signature_img)
+            path = generate_pdf(texts, output_name, base_pdf)
             st.success("PDF generated successfully!")
             st.markdown(file_download_link(path, "📄 Download PDF"), unsafe_allow_html=True)
 
 elif label_type == "Scrap Label":
-    st.info("Scrap Label generation coming soon. Please check back later.")
+    st.info("Scrap Label feature is under development.")
 
-elif label_type == "Other":
-    st.info("Other label types will be supported in future versions.")
+else:
+    st.warning("Please select a supported label type.")
