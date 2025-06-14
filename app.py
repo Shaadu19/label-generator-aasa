@@ -27,11 +27,7 @@ text_entries = [
     ((109.34, 553.29), (405.15, 553.29)),
     ((109.32, 533.69), (405.14, 533.69)),
     ((109.33, 496.80), (405.15, 496.80)),
-]
 
-# === SET BACKGROUND IMAGE ===
-def set_bg(image_file):
-    with open(image_file, "rb") as f:
         data = base64.b64encode(f.read()).decode()
     css = f"""
     <style>
@@ -45,7 +41,6 @@ def set_bg(image_file):
     """
     st.markdown(css, unsafe_allow_html=True)
 
-set_bg(BG_IMAGE)
 
 # === GENERATE PDF FUNCTION ===
 def generate_pdf(texts, output_file, base_pdf):
