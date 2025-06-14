@@ -80,7 +80,7 @@ if st.session_state.page == "home":
     with col1:
         if st.button("DISPATCH LABEL"):
             st.session_state.page = "dispatch"
-            st.experimental_rerun()
+            
     with col2:
         if st.button("SCRAP LABEL"):
             st.info("Scrap Label page is under construction.")
