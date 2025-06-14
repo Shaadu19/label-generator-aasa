@@ -5,18 +5,18 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
-from PIL import Image
 import base64
 import os
 
-# --- Setup ---
+# --- Paths ---
 FONT_PATH = "Arial-bold.ttf"
 INPUT_PDF_DEO = "LABELX.pdf"
 INPUT_PDF_AF = "LABELY.pdf"
 
+# Register font
 pdfmetrics.registerFont(TTFont("ArialBold", FONT_PATH))
 
-# --- PDF Text Coordinates ---
+# Coordinates for 8 labels (left & right column)
 text_entries = [
     ((109.33, 781.51), (407.84, 781.51)),
     ((109.35, 762.71), (405.16, 762.19)),
@@ -33,8 +33,9 @@ def generate_pdf(texts, output_file, base_pdf):
     packet = BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
     c.setFont("ArialBold", 10)
+
     for i in range(8):
-        for j in range(2):
+        for j in range(2):  # Left and right
             x, y = text_entries[i][j]
             c.drawString(x, y, texts[j])
     c.save()
@@ -55,27 +56,31 @@ def file_download_link(filepath, label):
     with open(filepath, "rb") as f:
         data = f.read()
     b64 = base64.b64encode(data).decode()
-    return f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(filepath)}">{label}</a>'
+    return href
 
 def show_logo():
-    st.image("https://chatgpt-image-hosting.s3.amazonaws.com/aasa-logo.png", width=120)
+    st.image("https://chatgpt-image-hosting.s3.amazonaws.com/aasa-logo.png", width=100)
 
-# --- Page Config ---
+# --- Streamlit App ---
 st.set_page_config(page_title="Label Generator", layout="centered")
-st.markdown("<style>body { background-color: #f8f8f8; }</style>", unsafe_allow_html=True)
 
-# --- Page State ---
+# Initialize session state
 if "page" not in st.session_state:
     st.session_state.page = "home"
+if "pdf_ready" not in st.session_state:
+    st.session_state.pdf_ready = False
 
 # --- PAGE 1: Main Menu ---
 if st.session_state.page == "home":
     show_logo()
-    st.markdown("<h2 style='text-align:center;'>SELECT LABEL TYPE</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>SELECT THE LABEL</h2>", unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("DISPATCH LABEL"):
             st.session_state.page = "dispatch"
+            st.experimental_rerun()
     with col2:
         if st.button("SCRAP LABEL"):
             st.info("Scrap Label page is under construction.")
@@ -86,32 +91,43 @@ elif st.session_state.page == "dispatch":
     with col1:
         if st.button("⬅️ Back"):
             st.session_state.page = "home"
+            st.session_state.pdf_ready = False
+            st.experimental_rerun()
     with col2:
         show_logo()
 
     st.markdown("<h3>Fill the Form Below</h3>", unsafe_allow_html=True)
-    product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
-    customer = st.text_input("Customer")
-    product = st.text_input("Product")
-    litho = st.text_input("Litho Number")
-    po = st.text_input("PO Number")
 
-    if st.button("Generate PDF"):
-        if not all([customer, product, litho, po]):
-            st.error("Please fill all fields.")
-        else:
-            texts = [customer, product]
-            output_name = f"{product.replace(' ', '_')}_{product_type}.pdf"
-            base_pdf = INPUT_PDF_DEO if product_type == "DEO" else INPUT_PDF_AF
-            path = generate_pdf(texts, output_name, base_pdf)
+    if not st.session_state.pdf_ready:
+        product_type = st.radio("Select Product Type", ["DEO", "AIR FRESHENER"])
+        customer = st.text_input("Customer")
+        product = st.text_input("Product")
+        litho = st.text_input("Litho Number")
+        po = st.text_input("PO Number")
 
-            st.success("✅ PDF generated successfully!")
+        if st.button("Generate PDF"):
+            if not all([customer, product, litho, po]):
+                st.error("Please fill all fields.")
+            else:
+                texts = [customer, product]
+                output_name = f"{product.replace(' ', '_')}_{product_type}.pdf"
+                base_pdf = INPUT_PDF_DEO if product_type == "DEO" else INPUT_PDF_AF
+                path = generate_pdf(texts, output_name, base_pdf)
 
-            # Embedded Preview
-            with open(path, "rb") as f:
-                base64_pdf = base64.b64encode(f.read()).decode("utf-8")
-                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
-                st.markdown(pdf_display, unsafe_allow_html=True)
+                st.session_state.generated_path = path
+                st.session_state.pdf_ready = True
+                st.experimental_rerun()
 
-            # Download Buttons
-            st.markdown(file_download_link(path, "📥 Download PDF"), unsafe_allow_html=True)
+    # --- Show Preview and Download ---
+    if st.session_state.pdf_ready:
+        st.success("✅ PDF generated successfully!")
+
+        with open(st.session_state.generated_path, "rb") as f:
+            base64_pdf = base64.b64encode(f.read()).decode("utf-8")
+            st.markdown(
+                f'<iframe src="data:application/pdf;base64,{base64_pdf}" '
+                f'width="100%" height="600px" type="application/pdf"></iframe>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown(file_download_link(st.session_state.generated_path, "📥 Download PDF"), unsafe_allow_html=True)
